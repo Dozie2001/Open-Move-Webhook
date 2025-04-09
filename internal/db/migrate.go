@@ -6,7 +6,7 @@ func Migrate() error {
 	err := DB.AutoMigrate(
 		&models.Webhook{},
 		&models.Subscription{},
-		// &models.Webhook{},
+		&models.DeliveryLog{},
 	)
 	return err
 }
