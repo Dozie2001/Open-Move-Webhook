@@ -27,7 +27,7 @@ func SetupDB() {
 		panic(fmt.Sprintf("Failed to convert POSTGRES_PORT to an integer: %v", err))
 	}
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8&parseTime=True&loc=Local", dbUsername, dbPass, dbHost, dbPort, dbName)
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable", dbHost, dbUsername, dbPass, dbName, dbPort)
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 
 	if err != nil {
