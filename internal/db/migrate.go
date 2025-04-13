@@ -7,6 +7,7 @@ func Migrate() error {
 		&models.Webhook{},
 		&models.Subscription{},
 		&models.DeliveryLog{},
+		&models.User{},
 	)
 	return err
 }
