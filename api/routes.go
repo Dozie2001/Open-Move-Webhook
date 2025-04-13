@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/Dozie2001/Open-Move-Webhook/internal/handlers"
+	"github.com/Dozie2001/Open-Move-Webhook/internal/middleware"
 	"os"
 
 	"github.com/gin-contrib/cors"
@@ -18,25 +19,19 @@ func BuildRoutesHandler() *gin.Engine {
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 	r.Use(cors.Default())
+	r.Use(middleware.RateLimitMiddleware())
 
 	r.GET("/health", handlers.HealthHandler)
 
-	// r.POST("/api/auth/verify", handlers.HandleAuth)
-	// r.POST("/api/auth/refresh", AuthMiddleware(), handlers.HandleTokenRefresh)
-
-	// // OAuth routes
-	// oauthRoutes := r.Group("/oauth")
-
-	// oauthRoutes.GET("/initialize", handlers.InitalizeOAuthSignIn)
-	// oauthRoutes.GET("/callback", handlers.HandleOAuthCallBack)
-
-	// All other API routes should be mounted on this route group
-	// apiRoutes := r.Group("/api")
-
-	// // mount the API routes auth middleware
-	// apiRoutes.Use(AuthMiddleware())
-
-	
+	// Subscription routes
+	subscriptionRoutes := r.Group("/api/v1/subscriptions")
+	{
+		subscriptionRoutes.Use(middleware.CacheMiddleware())
+		subscriptionRoutes.POST("", handlers.CreateSubscription)
+		subscriptionRoutes.GET("", handlers.ListSubscriptions)
+		subscriptionRoutes.DELETE("/:id", handlers.DeleteSubscription)
+		subscriptionRoutes.PATCH("/:id", handlers.UpdateSubscription)
+	}
 
 	return r
 }
