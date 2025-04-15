@@ -44,6 +44,7 @@ func BuildRoutesHandler() *gin.Engine {
 	{
 		auth.POST("/signup", handlers.SignUp)
 		auth.POST("/login", handlers.Login)
+		auth.POST("/refresh", handlers.RefreshToken)
 	}
 
 	// Protected route

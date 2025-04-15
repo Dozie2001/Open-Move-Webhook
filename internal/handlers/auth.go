@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Dozie2001/Open-Move-Webhook/internal/utils"
+	"github.com/google/uuid"
 
 	"github.com/Dozie2001/Open-Move-Webhook/internal/db"
 	"github.com/Dozie2001/Open-Move-Webhook/internal/models"
@@ -65,15 +66,54 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// JWT token
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": user.Id,
-		"exp":     time.Now().Add(time.Hour * 24).Unix(),
+		"exp":     time.Now().Add(15 * time.Minute).Unix(),
 	})
+	accessTokenString, _ := accessToken.SignedString(jwtSecret)
 
-	tokenString, _ := token.SignedString(jwtSecret)
+	refreshToken := uuid.NewString()
+	user.RefreshToken = utils.SQLNullString(refreshToken)
+	user.TokenExpiry = utils.SQLNullTime(time.Now().Add(7 * 24 * time.Hour))
+	db.DB.Save(&user)
 
-	c.JSON(http.StatusOK, gin.H{"token": tokenString})
+	c.JSON(http.StatusOK, gin.H{
+		"access_token":  accessTokenString,
+		"refresh_token": refreshToken,
+	})
+}
+
+func RefreshToken(c *gin.Context) {
+	var body struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+
+	if err := c.ShouldBindJSON(&body); err != nil || body.RefreshToken == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing refresh token"})
+		return
+	}
+
+	var user models.User
+	if err := db.DB.Where("refresh_token = ?", body.RefreshToken).First(&user).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
+		return
+	}
+
+	if !user.TokenExpiry.Valid || user.TokenExpiry.Time.Before(time.Now()) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Refresh token expired"})
+		return
+	}
+
+	// Generate new access token
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": user.Id,
+		"exp":     time.Now().Add(15 * time.Minute).Unix(),
+	})
+	accessTokenString, _ := accessToken.SignedString(jwtSecret)
+
+	c.JSON(http.StatusOK, gin.H{
+		"access_token": accessTokenString,
+	})
 }
 
 func Me(c *gin.Context) {
