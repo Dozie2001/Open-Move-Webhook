@@ -17,6 +17,7 @@ import (
 
 var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
 
+// signup with good old email and password.
 func SignUp(c *gin.Context) {
 	var body struct {
 		Email    string `json:"email"`
@@ -43,6 +44,8 @@ func SignUp(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Signup successful"})
 }
 
+// login user with email and password
+// TODO: send otp to email for verification
 func Login(c *gin.Context) {
 	var body struct {
 		Email    string `json:"email"`
@@ -68,13 +71,13 @@ func Login(c *gin.Context) {
 
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": user.Id,
-		"exp":     time.Now().Add(15 * time.Minute).Unix(),
+		"exp":     time.Now().Add(15 * time.Minute).Unix(), // 15 minutes
 	})
 	accessTokenString, _ := accessToken.SignedString(jwtSecret)
 
 	refreshToken := uuid.NewString()
 	user.RefreshToken = utils.SQLNullString(refreshToken)
-	user.TokenExpiry = utils.SQLNullTime(time.Now().Add(7 * 24 * time.Hour))
+	user.TokenExpiry = utils.SQLNullTime(time.Now().Add(7 * 24 * time.Hour)) // 7 days
 	db.DB.Save(&user)
 
 	c.JSON(http.StatusOK, gin.H{
@@ -83,6 +86,7 @@ func Login(c *gin.Context) {
 	})
 }
 
+// refresh token to get the access token
 func RefreshToken(c *gin.Context) {
 	var body struct {
 		RefreshToken string `json:"refresh_token"`
@@ -116,6 +120,8 @@ func RefreshToken(c *gin.Context) {
 	})
 }
 
+// get all of the user information
+// TODO: hide sensitive data in the payload
 func Me(c *gin.Context) {
 	userId := c.GetString("user_id")
 
@@ -126,4 +132,12 @@ func Me(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, user)
+}
+
+func ZkLogin(c *gin.Context) {
+
+}
+
+func ZkSalt(c *gin.Context) {
+
 }
