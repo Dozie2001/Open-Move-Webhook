@@ -1,9 +1,10 @@
 package api
 
 import (
-	"github.com/Dozie2001/Open-Move-Webhook/internal/handlers"
 	"os"
 
+	"github.com/Dozie2001/Open-Move-Webhook/internal/handlers"
+	"github.com/Dozie2001/Open-Move-Webhook/internal/middleware"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
@@ -36,7 +37,17 @@ func BuildRoutesHandler() *gin.Engine {
 	// // mount the API routes auth middleware
 	// apiRoutes.Use(AuthMiddleware())
 
-	
+	api := r.Group("/api")
+
+	// Auth routes
+	auth := api.Group("/auth")
+	{
+		auth.POST("/signup", handlers.SignUp)
+		auth.POST("/login", handlers.Login)
+	}
+
+	// Protected route
+	api.GET("/me", middleware.AuthMiddleware(), handlers.Me)
 
 	return r
 }
