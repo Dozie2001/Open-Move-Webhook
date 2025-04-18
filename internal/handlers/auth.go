@@ -8,8 +8,11 @@ import (
 	"github.com/Dozie2001/Open-Move-Webhook/internal/utils"
 	"github.com/google/uuid"
 
+	"database/sql"
+
 	"github.com/Dozie2001/Open-Move-Webhook/internal/db"
 	"github.com/Dozie2001/Open-Move-Webhook/internal/models"
+
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -87,7 +90,7 @@ func Login(c *gin.Context) {
 }
 
 // refresh token to get the access token
-func RefreshToken(c *gin.Context) {
+func RefreshAccessToken(c *gin.Context) {
 	var body struct {
 		RefreshToken string `json:"refresh_token"`
 	}
@@ -134,10 +137,111 @@ func Me(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
-func ZkLogin(c *gin.Context) {
+func ZKRegister(c *gin.Context) {
+	var body struct {
+		Sub     string `json:"sub"`
+		Email   string `json:"email"`
+		Salt    string `json:"salt"`
+		Address string `json:"address"`
+	}
 
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	var user models.User
+	result := db.DB.First(&user, "sub = ?", body.Sub)
+
+	if result.Error == nil {
+		salt, _ := utils.Decrypt(user.Salt.String)
+		access, refresh, _ := utils.GenerateTokens(body.Sub, body.Email)
+		c.JSON(http.StatusOK, gin.H{
+			"email":   user.Email,
+			"address": user.SuiAddress.String,
+			"salt":    salt,
+			"access":  access,
+			"refresh": refresh,
+		})
+		return
+	}
+
+	encryptedSalt, err := utils.Encrypt(body.Salt)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "encryption failed"})
+		return
+	}
+
+	user = models.User{
+		Email:      body.Email,
+		Sub:        sql.NullString{String: body.Sub, Valid: true},
+		Salt:       sql.NullString{String: encryptedSalt, Valid: true},
+		SuiAddress: sql.NullString{String: body.Address, Valid: true},
+	}
+
+	if err := db.DB.Create(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "user creation failed"})
+		return
+	}
+
+	access, refresh, _ := utils.GenerateTokens(body.Sub, body.Email)
+
+	c.JSON(http.StatusOK, gin.H{
+		"email":   user.Email,
+		"address": user.SuiAddress.String,
+		"salt":    body.Salt,
+		"access":  access,
+		"refresh": refresh,
+	})
 }
 
 func ZkSalt(c *gin.Context) {
+	sub := c.Query("sub")
+	var user models.User
+	result := db.DB.First(&user, "sub = ?", sub)
+	if result.Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"message": "user not found"})
+		return
+	}
 
+	decrypted, err := utils.Decrypt(user.Salt.String)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "decryption failed"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"salt": decrypted})
+}
+
+func ZKRefreshAccessToken(c *gin.Context) {
+	var body struct {
+		RefreshToken string `json:"refreshToken"`
+	}
+
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	token, err := utils.VerifyRefreshToken(body.RefreshToken)
+	if err != nil || !token.Valid {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired refresh token"})
+		return
+	}
+
+	claims := token.Claims.(jwt.MapClaims)
+	sub := claims["sub"].(string)
+
+	var user models.User
+	result := db.DB.First(&user, "sub = ?", sub)
+	if result.Error != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
+		return
+	}
+
+	access, refresh, _ := utils.GenerateTokens(user.Sub.String, user.Email)
+	c.JSON(http.StatusOK, gin.H{
+		"access":  access,
+		"refresh": refresh,
+	})
 }

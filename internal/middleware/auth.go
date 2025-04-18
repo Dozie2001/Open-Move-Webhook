@@ -35,13 +35,3 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 	}
 }
-
-// middleware that checks if the user sub exists in the database
-func AuthSubExist() {
-
-}
-
-// not sure we are going to even need this  function sef,
-func VerifyToken() {
-
-}

@@ -44,9 +44,15 @@ func BuildRoutesHandler() *gin.Engine {
 	{
 		auth.POST("/signup", handlers.SignUp)
 		auth.POST("/login", handlers.Login)
-		auth.POST("/refresh", handlers.RefreshToken)
+		auth.POST("/refresh", handlers.RefreshAccessToken)
 	}
 
+	zkauth := api.Group("/auth/zklogin")
+	{ // missing middleware -verifygoogletoken
+		zkauth.POST("/register", handlers.ZKRegister)
+		zkauth.GET("/salt", middleware.AuthMiddleware(), handlers.ZkSalt)
+		zkauth.POST("/refresh", handlers.ZKRefreshAccessToken)
+	}
 	// Protected route
 	api.GET("/me", middleware.AuthMiddleware(), handlers.Me)
 
